@@ -1,6 +1,6 @@
 # @francocdev/ai-chat-widget
 
-Drop-in AI chat widget for React apps. Configurable, themeable, with Markdown support. Built on the [Vercel AI SDK v6](https://sdk.vercel.ai/).
+Drop-in AI chat widget for React apps. Configurable, themeable, with Markdown support. **Styles are auto-injected — no CSS import needed.** Built on the [Vercel AI SDK v6](https://sdk.vercel.ai/).
 
 ```bash
 npm install @francocdev/ai-chat-widget
@@ -9,10 +9,7 @@ npm install @francocdev/ai-chat-widget
 ## Quick Start
 
 ```tsx
-// 1. Import styles (once, in your root layout)
-import "@francocdev/ai-chat-widget/styles.css";
-
-// 2. Wrap your app with the provider
+// 1. Wrap your app with the provider
 import { ChatWidgetProvider, ChatTrigger } from "@francocdev/ai-chat-widget";
 
 function App() {
@@ -32,7 +29,7 @@ function App() {
 ```
 
 ```ts
-// 3. Create your API route (Next.js App Router)
+// 2. Create your API route (Next.js App Router)
 // app/api/chat/route.ts
 import { createChatRoute } from "@francocdev/ai-chat-widget/server";
 

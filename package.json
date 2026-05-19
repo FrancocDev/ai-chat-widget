@@ -1,6 +1,6 @@
 {
   "name": "@francocdev/ai-chat-widget",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Drop-in AI chat widget for React apps. Configurable, themeable, with Markdown support.",
   "type": "module",
   "main": "./dist/index.js",
@@ -14,15 +14,16 @@
     "./server": {
       "import": "./dist/server.js",
       "types": "./dist/server.d.ts"
-    },
-    "./styles.css": "./dist/styles.css"
+    }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsup && cp src/styles/chat-widget.css dist/styles.css",
+    "build": "tsup",
     "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
@@ -52,7 +53,12 @@
     "react-markdown": "^10.1.0"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "jsdom": "^29.1.1",
     "tsup": "^8.0.0",
-    "typescript": "^5.8.0"
+    "typescript": "^5.8.0",
+    "vitest": "^4.1.6"
   }
 }
