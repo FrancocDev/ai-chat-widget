@@ -23,5 +23,7 @@ jobs:
       - run: bun run test
       - run: bun run build
 
+      - run: npm install -g npm@latest
+
       - name: Publish to npm (OIDC)
         run: npm publish --provenance --access public --registry https://registry.npmjs.org
