@@ -22,7 +22,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "test": "vitest run",
+    "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest",
     "prepublishOnly": "npm run build"
   },
