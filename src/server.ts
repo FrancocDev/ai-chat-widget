@@ -1,8 +1,5 @@
-import {
-  createOpenAI,
-  type OpenAIProvider,
-} from "@ai-sdk/openai";
-import { convertToModelMessages, streamText, type LanguageModel } from "ai";
+import { createOpenAI } from "@ai-sdk/openai";
+import { streamText, type ModelMessage } from "ai";
 import type { ChatRouteConfig } from "./types";
 
 /**
@@ -44,23 +41,23 @@ import type { ChatRouteConfig } from "./types";
  * ```
  */
 export function createChatRoute(config: ChatRouteConfig) {
-  let cachedModel: LanguageModel | null = null;
-
-  function getModel() {
-    if (cachedModel) return cachedModel;
-
-    const openai: OpenAIProvider = createOpenAI({
-      baseURL: config.baseURL ?? "https://api.openai.com/v1",
-      apiKey: config.apiKey,
-    });
-
-    cachedModel = openai(config.model ?? "gpt-4o-mini");
-    return cachedModel;
-  }
+  const openai = createOpenAI({
+    baseURL: config.baseURL ?? "https://api.openai.com/v1",
+    apiKey: config.apiKey,
+  });
+  const model = openai(config.model ?? "gpt-4o-mini");
 
   return async (request: Request): Promise<Response> => {
     try {
-      const { messages } = await request.json();
+      let body: { messages: unknown[] };
+      try {
+        body = await request.json();
+      } catch {
+        return new Response(JSON.stringify({ error: "Bad request" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
 
       const system =
         typeof config.systemPrompt === "function"
@@ -68,9 +65,9 @@ export function createChatRoute(config: ChatRouteConfig) {
           : config.systemPrompt;
 
       const result = streamText({
-        model: getModel(),
+        model,
         system,
-        messages: await convertToModelMessages(messages),
+        messages: body.messages as ModelMessage[],
       });
 
       return result.toUIMessageStreamResponse();

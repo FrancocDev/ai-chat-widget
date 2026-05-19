@@ -21,6 +21,21 @@ export interface ChatWidgetTheme {
   ring?: string;
 }
 
+export interface ChatWidgetLabels {
+  /** Loading indicator text (default: "Thinking...") */
+  thinking?: string;
+  /** Error message shown to the user (default: "Chat is temporarily unavailable. Please try again later.") */
+  error?: string;
+  /** Aria label for the toggle chat button (default: "Toggle chat") */
+  toggleChat?: string;
+  /** Tooltip for the clear chat button (default: "Clear chat") */
+  clearChat?: string;
+  /** Tooltip for the close panel button (default: "Close") */
+  close?: string;
+  /** Stop generating button (default: "Stop") */
+  stop?: string;
+}
+
 export interface ChatWidgetConfig {
   /** API endpoint for streaming chat (default: "/api/chat") */
   apiEndpoint?: string;
@@ -36,9 +51,23 @@ export interface ChatWidgetConfig {
   theme?: ChatWidgetTheme;
   /** localStorage key prefix */
   storageKey?: string;
+  /** Override built-in UI text labels */
+  labels?: ChatWidgetLabels;
 }
 
-export const DEFAULT_CONFIG: Required<ChatWidgetConfig> = {
+/** Resolved config with all defaults applied — theme props remain optional. */
+export interface ResolvedChatWidgetConfig {
+  apiEndpoint: string;
+  title: string;
+  subtitle: string;
+  placeholder: string;
+  emptyStateMessage: string;
+  theme: ChatWidgetTheme;
+  storageKey: string;
+  labels: Required<ChatWidgetLabels>;
+}
+
+export const DEFAULT_CONFIG: ResolvedChatWidgetConfig = {
   apiEndpoint: "/api/chat",
   title: "Ask me anything",
   subtitle: "Powered by AI",
@@ -46,6 +75,14 @@ export const DEFAULT_CONFIG: Required<ChatWidgetConfig> = {
   emptyStateMessage: "Ask me anything — I'm here to help!",
   theme: {},
   storageKey: "ai-chat-widget",
+  labels: {
+    thinking: "Thinking...",
+    error: "Chat is temporarily unavailable. Please try again later.",
+    toggleChat: "Toggle chat",
+    clearChat: "Clear chat",
+    close: "Close",
+    stop: "Stop",
+  },
 };
 
 export interface ChatRouteConfig {

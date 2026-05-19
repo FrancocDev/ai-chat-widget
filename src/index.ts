@@ -4,5 +4,7 @@ export { ChatWidget } from "./components/chat-widget";
 export type {
   ChatWidgetConfig,
   ChatWidgetTheme,
+  ChatWidgetLabels,
   ChatRouteConfig,
+  ResolvedChatWidgetConfig,
 } from "./types";

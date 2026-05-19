@@ -1,6 +1,6 @@
 {
   "name": "@francocdev/ai-chat-widget",
-  "version": "0.3.6",
+  "version": "0.4.0",
   "description": "Drop-in AI chat widget for React apps. Configurable, themeable, with Markdown support.",
   "type": "module",
   "main": "./dist/index.js",
@@ -35,6 +35,13 @@
     "vercel-ai",
     "chatbot"
   ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "license": "MIT",
   "author": "Franco Carrara <me@francoc.dev>",
   "repository": {
@@ -45,18 +52,23 @@
     "@ai-sdk/openai": "^3.0.0",
     "@ai-sdk/react": "^3.0.0",
     "ai": "^6.0.0",
+    "lucide-react": "^0.484.0",
     "react": "^18.0.0 || ^19.0.0",
     "react-dom": "^18.0.0 || ^19.0.0"
   },
   "dependencies": {
-    "lucide-react": "^0.484.0",
-    "react-markdown": "^10.1.0"
+    "focus-trap-react": "^12.0.2",
+    "react-markdown": "^10.1.0",
+    "react-syntax-highlighter": "^16.1.1"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
+    "@types/react-syntax-highlighter": "^15.5.13",
+    "jest-axe": "^10.0.0",
     "jsdom": "^29.1.1",
+    "msw": "^2.14.6",
     "tsup": "^8.0.0",
     "typescript": "^5.8.0",
     "vitest": "^4.1.6"

@@ -12,6 +12,7 @@ const { mockUseChat } = vi.hoisted(() => ({
     status: "ready",
     error: null,
     setMessages: vi.fn(),
+    stop: vi.fn(),
   })),
 }));
 
@@ -35,6 +36,7 @@ describe("ChatWidget", () => {
       status: "ready",
       error: null,
       setMessages: vi.fn(),
+      stop: vi.fn(),
     });
   });
 
@@ -93,6 +95,7 @@ describe("ChatWidget", () => {
       status: "submitted",
       error: null,
       setMessages: vi.fn(),
+      stop: vi.fn(),
     });
 
     render(
@@ -110,6 +113,7 @@ describe("ChatWidget", () => {
       status: "error",
       error: new Error("fail"),
       setMessages: vi.fn(),
+      stop: vi.fn(),
     });
 
     render(
@@ -129,6 +133,7 @@ describe("ChatWidget", () => {
       status: "streaming",
       error: null,
       setMessages: vi.fn(),
+      stop: vi.fn(),
     });
 
     render(
@@ -162,6 +167,68 @@ describe("ChatWidget", () => {
     expect(screen.getByText("Custom Chat")).toBeInTheDocument();
     expect(screen.getByText("v2")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Ask...")).toBeInTheDocument();
+  });
+
+  it("accepts className and style props", () => {
+    render(
+      <TestWrapper>
+        <ChatWidget onClose={vi.fn()} className="my-chat" style={{ border: "2px solid red" }} />
+      </TestWrapper>
+    );
+    const panel = document.querySelector(".acw-chat-panel.my-chat");
+    expect(panel).toBeInTheDocument();
+    expect(panel?.getAttribute("style")).toContain("border");
+  });
+
+  it("uses renderMessage slot when provided", () => {
+    mockUseChat.mockReturnValue({
+      messages: [
+        { id: "1", role: "user", parts: [{ type: "text", text: "Hi" }] },
+      ],
+      sendMessage: vi.fn(),
+      status: "ready",
+      error: null,
+      setMessages: vi.fn(),
+      stop: vi.fn(),
+    });
+
+    render(
+      <TestWrapper>
+        <ChatWidget
+          onClose={vi.fn()}
+          renderMessage={(msg) => <div data-testid="custom-msg">Custom: {String(msg)}</div>}
+        />
+      </TestWrapper>
+    );
+
+    expect(screen.getByTestId("custom-msg")).toBeInTheDocument();
+  });
+
+  it("uses custom labels", () => {
+    function CustomLabelWrapper({ children }: { children: ReactNode }) {
+      return (
+        <ChatWidgetProvider
+          config={{
+            labels: {
+              thinking: "Procesando...",
+              error: "Error fatal",
+              clearChat: "Borrar",
+              close: "Cerrar",
+            },
+          }}
+        >
+          {children}
+        </ChatWidgetProvider>
+      );
+    }
+
+    render(
+      <CustomLabelWrapper>
+        <ChatWidget onClose={vi.fn()} />
+      </CustomLabelWrapper>
+    );
+    expect(screen.getByTitle("Borrar")).toBeInTheDocument();
+    expect(screen.getByTitle("Cerrar")).toBeInTheDocument();
   });
 });
 

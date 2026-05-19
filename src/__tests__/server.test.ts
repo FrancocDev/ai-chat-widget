@@ -69,7 +69,7 @@ describe("createChatRoute", () => {
     expect(response.status).toBe(200);
   });
 
-  it("returns 500 on malformed JSON body", async () => {
+  it("returns 400 on malformed JSON body", async () => {
     const handler = createChatRoute({
       apiKey: "test-key",
       systemPrompt: "Hello",
@@ -81,7 +81,7 @@ describe("createChatRoute", () => {
     });
 
     const response = await handler(request);
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(400);
   });
 
   it("uses custom baseURL when provided", async () => {
