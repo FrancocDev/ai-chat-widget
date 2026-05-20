@@ -1,5 +1,5 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import { streamText, type ModelMessage } from "ai";
+import { streamText, convertToModelMessages, type UIMessage } from "ai";
 import type { ChatRouteConfig } from "./types";
 
 /**
@@ -49,7 +49,7 @@ export function createChatRoute(config: ChatRouteConfig) {
 
   return async (request: Request): Promise<Response> => {
     try {
-      let body: { messages: unknown[] };
+      let body: { messages: UIMessage[] };
       try {
         body = await request.json();
       } catch {
@@ -67,7 +67,7 @@ export function createChatRoute(config: ChatRouteConfig) {
       const result = streamText({
         model,
         system,
-        messages: body.messages as ModelMessage[],
+        messages: await convertToModelMessages(body.messages),
       });
 
       return result.toUIMessageStreamResponse();
