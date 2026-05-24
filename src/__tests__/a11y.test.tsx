@@ -6,20 +6,18 @@ import { ChatWidgetProvider } from "../provider";
 
 expect.extend(toHaveNoViolations);
 
-// Mock useChat
-const { mockUseChat } = vi.hoisted(() => ({
-  mockUseChat: vi.fn(() => ({
-    messages: [],
-    sendMessage: vi.fn(),
-    status: "ready",
-    error: null,
-    setMessages: vi.fn(),
-    stop: vi.fn(),
-  })),
+const mockUseChat = vi.fn(() => ({
+  messages: [],
+  sendMessage: vi.fn(),
+  status: "ready",
+  error: null,
+  setMessages: vi.fn(),
+  stop: vi.fn(),
+  addToolOutput: vi.fn(),
 }));
 
 vi.mock("@ai-sdk/react", () => ({
-  useChat: mockUseChat,
+  useChat: (...args: unknown[]) => mockUseChat(...args),
 }));
 
 import { ChatWidget } from "../components/chat-widget";
@@ -38,6 +36,7 @@ describe("Accessibility", () => {
       error: null,
       setMessages: vi.fn(),
       stop: vi.fn(),
+      addToolOutput: vi.fn(),
     });
   });
 

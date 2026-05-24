@@ -20,6 +20,7 @@ describe("ChatWidgetProvider", () => {
     expect(result.current.title).toBe(DEFAULT_CONFIG.title);
     expect(result.current.apiEndpoint).toBe(DEFAULT_CONFIG.apiEndpoint);
     expect(result.current.storageKey).toBe(DEFAULT_CONFIG.storageKey);
+    expect(result.current.tools).toEqual({});
   });
 
   it("merges partial config with defaults", () => {
@@ -42,6 +43,16 @@ describe("ChatWidgetProvider", () => {
     });
     expect(result.current.theme.primary).toBe("hsl(0 0% 0%)");
     expect(result.current.theme.muted).toBe(DEFAULT_CONFIG.theme.muted);
+  });
+
+  it("merges tool overrides", () => {
+    const mockTool = () => null;
+    const { result } = renderHook(() => useChatWidgetConfig(), {
+      wrapper: wrapper({
+        tools: { myTool: mockTool },
+      }),
+    });
+    expect(result.current.tools.myTool).toBe(mockTool);
   });
 
   it("renders style tag with CSS", () => {

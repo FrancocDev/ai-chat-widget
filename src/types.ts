@@ -1,3 +1,6 @@
+import type { ReactNode } from "react";
+import type { Tool } from "ai";
+
 export interface ChatWidgetTheme {
   /** Primary brand color (HSL) */
   primary?: string;
@@ -36,6 +39,25 @@ export interface ChatWidgetLabels {
   stop?: string;
 }
 
+/** Props passed to every registered tool component. */
+export interface ToolComponentProps {
+  /** The tool call ID from the AI model. */
+  toolCallId: string;
+  /** The arguments the model generated for this tool call. */
+  args: unknown;
+  /** Current execution status of the tool call. */
+  status: "pending" | "success" | "error";
+  /** Result returned after the tool executed (only when status is "success"). */
+  result?: unknown;
+  /** Error message if the tool execution failed (only when status is "error"). */
+  error?: string;
+  /** Call this to submit the tool result back to the AI model. */
+  addToolResult: (result: unknown) => void;
+}
+
+/** A React component that renders a tool call inline in the chat. */
+export type ToolComponent = React.FC<ToolComponentProps>;
+
 export interface ChatWidgetConfig {
   /** API endpoint for streaming chat (default: "/api/chat") */
   apiEndpoint?: string;
@@ -53,6 +75,8 @@ export interface ChatWidgetConfig {
   storageKey?: string;
   /** Override built-in UI text labels */
   labels?: ChatWidgetLabels;
+  /** Registered tool components keyed by tool name. */
+  tools?: Record<string, ToolComponent>;
 }
 
 /** Resolved config with all defaults applied — theme props remain optional. */
@@ -65,6 +89,7 @@ export interface ResolvedChatWidgetConfig {
   theme: ChatWidgetTheme;
   storageKey: string;
   labels: Required<ChatWidgetLabels>;
+  tools: Record<string, ToolComponent>;
 }
 
 export const DEFAULT_CONFIG: ResolvedChatWidgetConfig = {
@@ -83,6 +108,7 @@ export const DEFAULT_CONFIG: ResolvedChatWidgetConfig = {
     close: "Close",
     stop: "Stop",
   },
+  tools: {},
 };
 
 export interface ChatRouteConfig {
@@ -94,4 +120,6 @@ export interface ChatRouteConfig {
   model?: string;
   /** System prompt — static string or async function */
   systemPrompt: string | (() => string | Promise<string>);
+  /** Registered tools passed to the AI model. */
+  tools?: Record<string, Tool>;
 }

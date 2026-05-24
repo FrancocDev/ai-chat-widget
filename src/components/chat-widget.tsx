@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, type CSSProperties, type ReactNode } from "react";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, type UIMessage } from "ai";
+import { DefaultChatTransport, type UIMessage, isToolUIPart, getToolName } from "ai";
 import { MessageCircle, X, Send, Loader2, Trash2, Square } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { Light as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -51,6 +51,17 @@ interface ChatWidgetProps {
   renderMessage?: (message: ReturnType<typeof useChat>["messages"][number]) => ReactNode;
 }
 
+function mapToolState(state: string): "pending" | "success" | "error" {
+  switch (state) {
+    case "success":
+      return "success";
+    case "error":
+      return "error";
+    default:
+      return "pending";
+  }
+}
+
 export function ChatWidget({ onClose, onReady, className, style, renderMessage }: ChatWidgetProps) {
   const {
     apiEndpoint,
@@ -60,6 +71,7 @@ export function ChatWidget({ onClose, onReady, className, style, renderMessage }
     emptyStateMessage,
     storageKey,
     labels,
+    tools,
   } = useChatWidgetConfig();
 
   const messagesKey = `${storageKey}-messages`;
@@ -74,7 +86,7 @@ export function ChatWidget({ onClose, onReady, className, style, renderMessage }
   const inputRef = useRef<HTMLInputElement>(null);
   const [initialMessages] = useState(() => getStoredMessages(messagesKey));
 
-  const { messages, sendMessage, status, error, setMessages, stop } = useChat({
+  const { messages, sendMessage, status, error, setMessages, stop, addToolOutput } = useChat({
     transport: transportRef.current!,
     messages: initialMessages,
   });
@@ -214,24 +226,34 @@ export function ChatWidget({ onClose, onReady, className, style, renderMessage }
             );
           }
 
+          const isUser = message.role === "user";
           const text = message.parts
             .filter((part) => part.type === "text")
             .map((part) => part.text)
             .join("");
 
-          const isUser = message.role === "user";
+          if (isUser) {
+            return (
+              <div
+                key={message.id}
+                className="acw-message-row acw-user-row"
+              >
+                <div className="acw-bubble acw-user-bubble">
+                  {text}
+                </div>
+              </div>
+            );
+          }
 
+          // Assistant message — render text parts and tool parts
           return (
             <div
               key={message.id}
-              className={`acw-message-row ${isUser ? "acw-user-row" : "acw-assistant-row"}`}
+              className="acw-message-row acw-assistant-row"
             >
-              <div
-                className={`acw-bubble ${isUser ? "acw-user-bubble" : "acw-assistant-bubble"}`}
-              >
-                {isUser ? (
-                  text
-                ) : (
+              <div className="acw-bubble acw-assistant-bubble">
+                {/* Text content */}
+                {text && (
                   <div className="acw-markdown">
                     <ReactMarkdown
                       components={{
@@ -268,6 +290,44 @@ export function ChatWidget({ onClose, onReady, className, style, renderMessage }
                     </ReactMarkdown>
                   </div>
                 )}
+
+                {/* Tool invocations */}
+                {message.parts.map((part) => {
+                  if (!isToolUIPart(part)) return null;
+
+                  const toolName = getToolName(part);
+                  const ToolComponent = tools[toolName];
+                  const toolStatus = mapToolState(
+                    "state" in part && typeof part.state === "string" ? part.state : "pending"
+                  );
+
+                  if (!ToolComponent) {
+                    return (
+                      <div key={part.toolCallId} className="acw-tool-call-fallback">
+                        Running {toolName}...
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={part.toolCallId} className="acw-tool-call">
+                      <ToolComponent
+                        toolCallId={part.toolCallId}
+                        args={"input" in part ? part.input : undefined}
+                        status={toolStatus}
+                        result={"output" in part ? part.output : undefined}
+                        error={"errorText" in part && typeof part.errorText === "string" ? part.errorText : undefined}
+                        addToolResult={(result) =>
+                          addToolOutput({
+                            tool: toolName,
+                            toolCallId: part.toolCallId,
+                            output: result,
+                          })
+                        }
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );

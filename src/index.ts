@@ -7,4 +7,6 @@ export type {
   ChatWidgetLabels,
   ChatRouteConfig,
   ResolvedChatWidgetConfig,
+  ToolComponentProps,
+  ToolComponent,
 } from "./types";

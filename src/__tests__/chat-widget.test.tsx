@@ -5,19 +5,18 @@ import { act } from "react";
 import { ChatWidgetProvider } from "../provider";
 import type { ReactNode } from "react";
 
-const { mockUseChat } = vi.hoisted(() => ({
-  mockUseChat: vi.fn(() => ({
-    messages: [],
-    sendMessage: vi.fn(),
-    status: "ready",
-    error: null,
-    setMessages: vi.fn(),
-    stop: vi.fn(),
-  })),
+const mockUseChat = vi.fn(() => ({
+  messages: [],
+  sendMessage: vi.fn(),
+  status: "ready",
+  error: null,
+  setMessages: vi.fn(),
+  stop: vi.fn(),
+  addToolOutput: vi.fn(),
 }));
 
 vi.mock("@ai-sdk/react", () => ({
-  useChat: mockUseChat,
+  useChat: (...args: unknown[]) => mockUseChat(...args),
 }));
 
 // Must import components AFTER the mock
@@ -37,6 +36,7 @@ describe("ChatWidget", () => {
       error: null,
       setMessages: vi.fn(),
       stop: vi.fn(),
+      addToolOutput: vi.fn(),
     });
   });
 
@@ -96,6 +96,7 @@ describe("ChatWidget", () => {
       error: null,
       setMessages: vi.fn(),
       stop: vi.fn(),
+      addToolOutput: vi.fn(),
     });
 
     render(
@@ -114,6 +115,7 @@ describe("ChatWidget", () => {
       error: new Error("fail"),
       setMessages: vi.fn(),
       stop: vi.fn(),
+      addToolOutput: vi.fn(),
     });
 
     render(
@@ -134,6 +136,7 @@ describe("ChatWidget", () => {
       error: null,
       setMessages: vi.fn(),
       stop: vi.fn(),
+      addToolOutput: vi.fn(),
     });
 
     render(
@@ -190,6 +193,7 @@ describe("ChatWidget", () => {
       error: null,
       setMessages: vi.fn(),
       stop: vi.fn(),
+      addToolOutput: vi.fn(),
     });
 
     render(
@@ -229,6 +233,149 @@ describe("ChatWidget", () => {
     );
     expect(screen.getByTitle("Borrar")).toBeInTheDocument();
     expect(screen.getByTitle("Cerrar")).toBeInTheDocument();
+  });
+
+  it("renders registered tool components for tool-call parts", () => {
+    const addToolOutput = vi.fn();
+    mockUseChat.mockReturnValue({
+      messages: [
+        {
+          id: "2",
+          role: "assistant",
+          parts: [
+            { type: "text", text: "Let me help you with that." },
+            {
+              type: "tool-showForm",
+              toolCallId: "tc-1",
+              state: "input-available",
+              input: { title: "Contact" },
+            } as any,
+          ],
+        },
+      ],
+      sendMessage: vi.fn(),
+      status: "ready",
+      error: null,
+      setMessages: vi.fn(),
+      stop: vi.fn(),
+      addToolOutput,
+    });
+
+    function ToolWrapper({ children }: { children: ReactNode }) {
+      return (
+        <ChatWidgetProvider
+          config={{
+            tools: {
+              showForm: ({ args, addToolResult }) => (
+                <div data-testid="tool-form">
+                  <span data-testid="tool-args">{JSON.stringify(args)}</span>
+                  <button
+                    data-testid="tool-submit"
+                    onClick={() => addToolResult({ success: true })}
+                  >
+                    Submit
+                  </button>
+                </div>
+              ),
+            },
+          }}
+        >
+          {children}
+        </ChatWidgetProvider>
+      );
+    }
+
+    render(
+      <ToolWrapper>
+        <ChatWidget onClose={vi.fn()} />
+      </ToolWrapper>
+    );
+
+    expect(screen.getByTestId("tool-form")).toBeInTheDocument();
+    expect(screen.getByTestId("tool-args")).toHaveTextContent('{"title":"Contact"}');
+  });
+
+  it("shows fallback text for unregistered tools", () => {
+    mockUseChat.mockReturnValue({
+      messages: [
+        {
+          id: "2",
+          role: "assistant",
+          parts: [
+            {
+              type: "tool-unknownTool",
+              toolCallId: "tc-1",
+              state: "input-available",
+              input: {},
+            } as any,
+          ],
+        },
+      ],
+      sendMessage: vi.fn(),
+      status: "ready",
+      error: null,
+      setMessages: vi.fn(),
+      stop: vi.fn(),
+      addToolOutput: vi.fn(),
+    });
+
+    render(
+      <TestWrapper>
+        <ChatWidget onClose={vi.fn()} />
+      </TestWrapper>
+    );
+
+    expect(screen.getByText(/Running unknownTool/)).toBeInTheDocument();
+  });
+
+  it("passes tool result to component when available", () => {
+    mockUseChat.mockReturnValue({
+      messages: [
+        {
+          id: "2",
+          role: "assistant",
+          parts: [
+            {
+              type: "tool-showForm",
+              toolCallId: "tc-1",
+              state: "success",
+              input: {},
+              output: { success: true },
+            } as any,
+          ],
+        },
+      ],
+      sendMessage: vi.fn(),
+      status: "ready",
+      error: null,
+      setMessages: vi.fn(),
+      stop: vi.fn(),
+      addToolOutput: vi.fn(),
+    });
+
+    function ToolWrapper({ children }: { children: ReactNode }) {
+      return (
+        <ChatWidgetProvider
+          config={{
+            tools: {
+              showForm: ({ status, result }) => (
+                <div data-testid="tool-status">{status}</div>
+              ),
+            },
+          }}
+        >
+          {children}
+        </ChatWidgetProvider>
+      );
+    }
+
+    render(
+      <ToolWrapper>
+        <ChatWidget onClose={vi.fn()} />
+      </ToolWrapper>
+    );
+
+    expect(screen.getByTestId("tool-status")).toHaveTextContent("success");
   });
 });
 

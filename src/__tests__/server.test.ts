@@ -105,4 +105,28 @@ describe("createChatRoute", () => {
       apiKey: "test-key",
     });
   });
+
+  it("passes tools to streamText when provided", async () => {
+    const { streamText } = await import("ai");
+    const mockTool = { type: "tool", description: "Test tool" } as unknown as import("ai").Tool;
+
+    const handler = createChatRoute({
+      apiKey: "test-key",
+      systemPrompt: "Hello",
+      tools: { testTool: mockTool },
+    });
+
+    await handler(
+      new Request("https://example.com/api/chat", {
+        method: "POST",
+        body: JSON.stringify({ messages: [{ role: "user", content: "Hi" }] }),
+      })
+    );
+
+    expect(streamText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tools: { testTool: mockTool },
+      })
+    );
+  });
 });

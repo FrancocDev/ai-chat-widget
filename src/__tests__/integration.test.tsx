@@ -6,20 +6,18 @@ import { ChatWidgetProvider } from "../provider";
 import { server, mockChatHandler, mockChatErrorHandler } from "./mocks/server";
 import { http, HttpResponse } from "msw";
 
-// Our own mock for useChat to simulate a working chat
-const { mockUseChat } = vi.hoisted(() => ({
-  mockUseChat: vi.fn(() => ({
-    messages: [],
-    sendMessage: vi.fn(),
-    status: "ready",
-    error: null,
-    setMessages: vi.fn(),
-    stop: vi.fn(),
-  })),
+const mockUseChat = vi.fn(() => ({
+  messages: [],
+  sendMessage: vi.fn(),
+  status: "ready",
+  error: null,
+  setMessages: vi.fn(),
+  stop: vi.fn(),
+  addToolOutput: vi.fn(),
 }));
 
 vi.mock("@ai-sdk/react", () => ({
-  useChat: mockUseChat,
+  useChat: (...args: unknown[]) => mockUseChat(...args),
 }));
 
 import { ChatWidget } from "../components/chat-widget";
@@ -46,6 +44,7 @@ describe("Integration", () => {
       error: null,
       setMessages: vi.fn(),
       stop: vi.fn(),
+      addToolOutput: vi.fn(),
     });
 
     const user = userEvent.setup();
@@ -81,6 +80,7 @@ describe("Integration", () => {
       error: null,
       setMessages: vi.fn(),
       stop: vi.fn(),
+      addToolOutput: vi.fn(),
     });
 
     render(
@@ -104,6 +104,7 @@ describe("Integration", () => {
       error: null,
       setMessages: vi.fn(),
       stop: stopMock,
+      addToolOutput: vi.fn(),
     });
 
     render(
@@ -124,6 +125,7 @@ describe("Integration", () => {
       error: null,
       setMessages: vi.fn(),
       stop: vi.fn(),
+      addToolOutput: vi.fn(),
     });
 
     render(
@@ -156,6 +158,7 @@ describe("Integration", () => {
       error: null,
       setMessages: vi.fn(),
       stop: vi.fn(),
+      addToolOutput: vi.fn(),
     });
 
     render(

@@ -40,6 +40,7 @@ export function ChatWidgetProvider({
     ...config,
     theme: { ...DEFAULT_CONFIG.theme, ...config.theme },
     labels: { ...DEFAULT_CONFIG.labels, ...config.labels },
+    tools: { ...DEFAULT_CONFIG.tools, ...config.tools },
   };
 
   return (

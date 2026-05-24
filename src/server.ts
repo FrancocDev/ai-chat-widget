@@ -68,6 +68,7 @@ export function createChatRoute(config: ChatRouteConfig) {
         model,
         system,
         messages: await convertToModelMessages(body.messages),
+        tools: config.tools,
       });
 
       return result.toUIMessageStreamResponse();
