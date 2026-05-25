@@ -17,12 +17,9 @@ export interface ChatWidgetProviderProps {
   children: ReactNode;
 }
 
-let cssInjected = false;
-
 function StyleInjector() {
   useInsertionEffect(() => {
-    if (cssInjected) return;
-    cssInjected = true;
+    if (document.querySelector("style[data-acw]")) return;
     const style = document.createElement("style");
     style.setAttribute("data-acw", "");
     style.textContent = CHAT_WIDGET_CSS;

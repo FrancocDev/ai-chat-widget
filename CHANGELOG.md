@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.5.1] - 2026-05-24
+
+### Fixed
+- **CSS injection survives Astro View Transitions**: Replaced module-level `cssInjected` singleton flag with DOM check (`document.querySelector("style[data-acw]")`). When using frameworks with client-side navigation (e.g., Astro ClientRouter, Next.js App Router), the `<head>` may be swapped, removing the injected `<style>` tag. The widget now correctly re-injects CSS on remount if the style element is missing.
+
 ## [0.4.0] - 2026-05-19
 
 ### Added
