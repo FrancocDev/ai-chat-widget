@@ -1,11 +1,11 @@
 # Changelog
 
-## [0.5.4] - 2026-05-25
+## [0.5.5] - 2026-05-25
 
 ### Fixed
-- **Multi-step tool execution**: Added `maxSteps: 10` to `streamText` in `createChatRoute`. This allows the AI model to perform multiple tool calls in a single conversation turn and properly handle client-side tool results without `MissingToolResultsError`.
+- **Removed experimental tool support from `createChatRoute`**: The `tools` option on `ChatRouteConfig` was causing `MissingToolResultsError` with `ai` v6 `streamText`. `createChatRoute` now performs simple text streaming without tools. For tool-based workflows, implement your own server route using `generateText` or `streamText` with `maxSteps` directly.
 
-## [0.5.2] - 2026-05-24
+## [0.5.4] - 2026-05-25
 
 ### Fixed
 - **Client-side tool support for `ai` v6**: `createChatRoute` now automatically wraps tools without an `execute` function (client-side UI tools) with a proxy `execute` that returns `{ __client_tool: true, args }`. This prevents `MissingToolResultsError` from `streamText` in `ai` v6, which requires all tools passed to it to have an `execute` function. Server-side tools (with `execute`) continue to work as before.

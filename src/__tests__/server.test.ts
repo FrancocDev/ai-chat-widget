@@ -92,7 +92,6 @@ describe("createChatRoute", () => {
       systemPrompt: "Hello",
     });
 
-    // Trigger model creation by calling the handler
     await handler(
       new Request("https://example.com/api/chat", {
         method: "POST",
@@ -104,38 +103,5 @@ describe("createChatRoute", () => {
       baseURL: "https://api.groq.com/openai/v1",
       apiKey: "test-key",
     });
-  });
-
-  it("passes tools to streamText when provided", async () => {
-    const { streamText } = await import("ai");
-    const mockTool = { type: "tool", description: "Test tool" } as unknown as import("ai").Tool;
-
-    const handler = createChatRoute({
-      apiKey: "test-key",
-      systemPrompt: "Hello",
-      tools: { testTool: mockTool },
-    });
-
-    await handler(
-      new Request("https://example.com/api/chat", {
-        method: "POST",
-        body: JSON.stringify({ messages: [{ role: "user", content: "Hi" }] }),
-      })
-    );
-
-    const call = (streamText as any).mock.calls[0][0];
-    expect(call).toMatchObject({
-      messages: [{ role: "user", content: "Hi" }],
-      model: { modelId: "gpt-4o-mini" },
-      system: "Hello",
-    });
-    expect(call.tools).toBeDefined();
-    expect(call.tools.testTool).toMatchObject({
-      description: "Test tool",
-      type: "tool",
-    });
-    // Client-side tools get wrapped with an execute proxy
-    expect(typeof call.tools.testTool.execute).toBe("function");
-    expect(call.maxSteps).toBe(10);
   });
 });
