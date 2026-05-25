@@ -8,7 +8,6 @@ export default defineConfig({
   format: ["esm"],
   dts: true,
   clean: true,
-  splitting: true,
   external: [
     "react",
     "react-dom",
@@ -18,7 +17,6 @@ export default defineConfig({
     "react-markdown",
     "lucide-react",
     "react-syntax-highlighter",
-    "focus-trap-react",
   ],
   treeshake: true,
 });

@@ -1,46 +1,25 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, type CSSProperties, type ReactNode } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo, type CSSProperties, type ReactNode } from "react";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, type UIMessage, isToolUIPart, getToolName } from "ai";
-import { MessageCircle, X, Send, Loader2, Trash2, Square } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import { Light as SyntaxHighlighter } from "react-syntax-highlighter";
-import js from "react-syntax-highlighter/dist/esm/languages/hljs/javascript.js";
-import ts from "react-syntax-highlighter/dist/esm/languages/hljs/typescript.js";
-import py from "react-syntax-highlighter/dist/esm/languages/hljs/python.js";
-import bash from "react-syntax-highlighter/dist/esm/languages/hljs/bash.js";
-import json from "react-syntax-highlighter/dist/esm/languages/hljs/json.js";
-import css from "react-syntax-highlighter/dist/esm/languages/hljs/css.js";
-import xml from "react-syntax-highlighter/dist/esm/languages/hljs/xml.js";
-import sql from "react-syntax-highlighter/dist/esm/languages/hljs/sql.js";
-import { docco } from "react-syntax-highlighter/dist/esm/styles/hljs/index.js";
+import { DefaultChatTransport, type UIMessage } from "ai";
+import { MessageCircle, X, Trash2 } from "lucide-react";
 import { useChatWidgetConfig } from "../provider";
+import { useChatStorage } from "../hooks/use-chat-storage";
+import { MessageList } from "./message-list";
+import { MessageInput } from "./message-input";
+import type { ChatWidgetMessage } from "../types";
 
-SyntaxHighlighter.registerLanguage("javascript", js);
-SyntaxHighlighter.registerLanguage("js", js);
-SyntaxHighlighter.registerLanguage("jsx", js);
-SyntaxHighlighter.registerLanguage("typescript", ts);
-SyntaxHighlighter.registerLanguage("ts", ts);
-SyntaxHighlighter.registerLanguage("tsx", ts);
-SyntaxHighlighter.registerLanguage("python", py);
-SyntaxHighlighter.registerLanguage("py", py);
-SyntaxHighlighter.registerLanguage("bash", bash);
-SyntaxHighlighter.registerLanguage("sh", bash);
-SyntaxHighlighter.registerLanguage("json", json);
-SyntaxHighlighter.registerLanguage("css", css);
-SyntaxHighlighter.registerLanguage("html", xml);
-SyntaxHighlighter.registerLanguage("xml", xml);
-SyntaxHighlighter.registerLanguage("sql", sql);
+function isValidRole(role: string): role is ChatWidgetMessage["role"] {
+  return role === "user" || role === "assistant" || role === "system" || role === "data";
+}
 
-function getStoredMessages(key: string) {
-  if (typeof window === "undefined") return [];
-  try {
-    const stored = localStorage.getItem(key);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
+function mapUIMessage(msg: UIMessage): ChatWidgetMessage {
+  return {
+    id: msg.id,
+    role: isValidRole(msg.role) ? msg.role : "assistant",
+    parts: msg.parts as ChatWidgetMessage["parts"],
+  };
 }
 
 interface ChatWidgetProps {
@@ -48,18 +27,7 @@ interface ChatWidgetProps {
   onReady?: () => void;
   className?: string;
   style?: CSSProperties;
-  renderMessage?: (message: ReturnType<typeof useChat>["messages"][number]) => ReactNode;
-}
-
-function mapToolState(state: string): "pending" | "success" | "error" {
-  switch (state) {
-    case "success":
-      return "success";
-    case "error":
-      return "error";
-    default:
-      return "pending";
-  }
+  renderMessage?: (message: ChatWidgetMessage) => ReactNode;
 }
 
 export function ChatWidget({ onClose, onReady, className, style, renderMessage }: ChatWidgetProps) {
@@ -75,59 +43,64 @@ export function ChatWidget({ onClose, onReady, className, style, renderMessage }
   } = useChatWidgetConfig();
 
   const messagesKey = `${storageKey}-messages`;
-  const transportRef = useRef<DefaultChatTransport<UIMessage> | null>(null);
-  if (!transportRef.current) {
-    transportRef.current = new DefaultChatTransport({ api: apiEndpoint });
-  }
+  const { initialMessages, persist, clear } = useChatStorage(messagesKey);
+
+  // Lazy initialization of transport (fix: no side effects during render)
+  const [transport, setTransport] = useState(() => new DefaultChatTransport({ api: apiEndpoint }));
+  useEffect(() => {
+    setTransport(new DefaultChatTransport({ api: apiEndpoint }));
+  }, [apiEndpoint]);
 
   const [input, setInput] = useState("");
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [initialMessages] = useState(() => getStoredMessages(messagesKey));
 
   const { messages, sendMessage, status, error, setMessages, stop, addToolOutput } = useChat({
-    transport: transportRef.current!,
-    messages: initialMessages,
+    transport,
+    messages: initialMessages as UIMessage[],
   });
 
   const isLoading = status === "submitted" || status === "streaming";
 
+  // Debounced persistence of messages
   useEffect(() => {
-    localStorage.setItem(messagesKey, JSON.stringify(messages));
-  }, [messages, messagesKey]);
+    persist(messages);
+  }, [messages, persist]);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, status]);
-
+  // Cross-tab sync
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
       if (e.key === messagesKey && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue);
-          if (Array.isArray(parsed)) setMessages(parsed);
-        } catch { /* ignore malformed storage */ }
+          // New format: { v: 1, messages: [...] }
+          const msgs = parsed.v === 1 && Array.isArray(parsed.messages) ? parsed.messages : parsed;
+          if (Array.isArray(msgs)) setMessages(msgs);
+        } catch (err) {
+          if (process.env.NODE_ENV !== "production") {
+            console.debug("[ai-chat-widget] Failed to parse cross-tab storage event:", err);
+          }
+        }
       }
     };
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
   }, [messagesKey, setMessages]);
 
-  // Auto-focus input when panel opens
+  // Notify parent that the chunk has loaded (only once)
+  const hasFiredReadyRef = useRef(false);
   useEffect(() => {
-    requestAnimationFrame(() => inputRef.current?.focus());
+    if (!hasFiredReadyRef.current) {
+      hasFiredReadyRef.current = true;
+      onReady?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- should only fire once on mount
   }, []);
-
-  // Notify parent that the chunk has loaded
-  useEffect(() => {
-    onReady?.();
-  }, [onReady]);
 
   // Focus trap + Escape to close
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Escape") {
+        e.stopPropagation();
         onClose();
         return;
       }
@@ -137,7 +110,7 @@ export function ChatWidget({ onClose, onReady, className, style, renderMessage }
       if (!panel) return;
 
       const focusable = panel.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), [href], input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        'button:not([disabled]), [href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), details:not([disabled]), summary:not([disabled]), [contenteditable]:not([contenteditable="false"]), [tabindex]:not([tabindex="-1"])'
       );
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
@@ -158,17 +131,24 @@ export function ChatWidget({ onClose, onReady, className, style, renderMessage }
     [onClose]
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = () => {
     if (!input.trim() || isLoading) return;
     sendMessage({ text: input });
     setInput("");
   };
 
   const handleClear = () => {
-    setMessages([]);
-    localStorage.removeItem(messagesKey);
+    const shouldClear =
+      typeof window === "undefined" ||
+      typeof window.confirm !== "function" ||
+      window.confirm("Are you sure you want to clear the chat history?");
+    if (shouldClear) {
+      setMessages([]);
+      clear();
+    }
   };
+
+  const mappedMessages: ChatWidgetMessage[] = useMemo(() => messages.map(mapUIMessage), [messages]);
 
   return (
     <div
@@ -207,184 +187,29 @@ export function ChatWidget({ onClose, onReady, className, style, renderMessage }
       </div>
 
       {/* Messages */}
-      <div className="acw-messages" aria-live="polite" role="log" aria-label="Conversation messages">
-        {messages.length === 0 && (
-          <div className="acw-empty-state">
-            <div className="acw-icon-muted acw-h-12 acw-w-12">
-              <MessageCircle className="acw-h-6 acw-w-6" />
-            </div>
-            <p>{emptyStateMessage}</p>
-          </div>
-        )}
-
-        {messages.map((message) => {
-          if (renderMessage) {
-            return (
-              <div key={message.id} className="acw-message-row">
-                {renderMessage(message)}
-              </div>
-            );
-          }
-
-          const isUser = message.role === "user";
-          const text = message.parts
-            .filter((part) => part.type === "text")
-            .map((part) => part.text)
-            .join("");
-
-          if (isUser) {
-            return (
-              <div
-                key={message.id}
-                className="acw-message-row acw-user-row"
-              >
-                <div className="acw-bubble acw-user-bubble">
-                  {text}
-                </div>
-              </div>
-            );
-          }
-
-          // Assistant message — render text parts and tool parts
-          return (
-            <div
-              key={message.id}
-              className="acw-message-row acw-assistant-row"
-            >
-              <div className="acw-bubble acw-assistant-bubble">
-                {/* Text content */}
-                {text && (
-                  <div className="acw-markdown">
-                    <ReactMarkdown
-                      components={{
-                        a: ({ ...props }) => (
-                          <a
-                            {...props}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          />
-                        ),
-                        code: ({ className, children, ...props }: { className?: string; children?: ReactNode }) => {
-                          const match = /language-(\w+)/.exec(className ?? "");
-                          const codeStr = String(children).replace(/\n$/, "");
-                          if (match) {
-                            return (
-                              <SyntaxHighlighter
-                                language={match[1]}
-                                style={docco}
-                                PreTag="div"
-                              >
-                                {codeStr}
-                              </SyntaxHighlighter>
-                            );
-                          }
-                          return (
-                            <code className={className} {...props}>
-                              {children}
-                            </code>
-                          );
-                        },
-                      }}
-                    >
-                      {text}
-                    </ReactMarkdown>
-                  </div>
-                )}
-
-                {/* Tool invocations */}
-                {message.parts.map((part) => {
-                  if (!isToolUIPart(part)) return null;
-
-                  const toolName = getToolName(part);
-                  const ToolComponent = tools[toolName];
-                  const toolStatus = mapToolState(
-                    "state" in part && typeof part.state === "string" ? part.state : "pending"
-                  );
-
-                  if (!ToolComponent) {
-                    return (
-                      <div key={part.toolCallId} className="acw-tool-call-fallback">
-                        Running {toolName}...
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div key={part.toolCallId} className="acw-tool-call">
-                      <ToolComponent
-                        toolCallId={part.toolCallId}
-                        args={"input" in part ? part.input : undefined}
-                        status={toolStatus}
-                        result={"output" in part ? part.output : undefined}
-                        error={"errorText" in part && typeof part.errorText === "string" ? part.errorText : undefined}
-                        addToolResult={(result) =>
-                          addToolOutput({
-                            tool: toolName,
-                            toolCallId: part.toolCallId,
-                            output: result,
-                          })
-                        }
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-
-        {isLoading &&
-          messages[messages.length - 1]?.role !== "assistant" && (
-            <div className="acw-message-row acw-assistant-row">
-              <div className="acw-loading-bubble">
-                <Loader2 className="acw-h-4 acw-w-4 acw-spinner" />
-                <span>{labels.thinking}</span>
-              </div>
-            </div>
-          )}
-
-        {error && (
-          <div className="acw-message-row acw-assistant-row">
-            <div className="acw-error-bubble">
-              {labels.error}
-            </div>
-          </div>
-        )}
-
-        <div ref={messagesEndRef} />
-      </div>
+      <MessageList
+        messages={mappedMessages}
+        labels={labels}
+        emptyStateMessage={emptyStateMessage}
+        tools={tools}
+        addToolOutput={addToolOutput}
+        isLoading={isLoading}
+        error={error}
+        renderMessage={renderMessage}
+      />
 
       {/* Input */}
-      <form onSubmit={handleSubmit} className="acw-input-area">
-        <input
-          ref={inputRef}
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={placeholder}
-          disabled={isLoading}
-          className="acw-input"
-        />
-        <button
-          type="submit"
-          disabled={isLoading || !input.trim()}
-          className="acw-send-btn"
-          aria-label="Send message"
-        >
-          <Send className="acw-h-3.5 acw-w-3.5" />
-        </button>
-        {status === "streaming" && (
-          <button
-            type="button"
-            onClick={() => stop()}
-            className="acw-icon-btn acw-stop-btn"
-            title={labels.stop}
-            aria-label={labels.stop}
-          >
-            <Square className="acw-h-3.5 acw-w-3.5" />
-          </button>
-        )}
-      </form>
+      <MessageInput
+        input={input}
+        setInput={setInput}
+        placeholder={placeholder}
+        isLoading={isLoading}
+        isStreaming={status === "streaming"}
+        onSubmit={handleSubmit}
+        onStop={stop}
+        label={labels.messageInputLabel}
+        stopLabel={labels.stop}
+      />
     </div>
   );
 }

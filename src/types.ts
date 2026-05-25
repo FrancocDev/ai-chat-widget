@@ -1,6 +1,38 @@
 import type { ReactNode } from "react";
 import type { Tool } from "ai";
 
+/** Minimal message shape exposed by the widget.
+ *  Decouples public API from @ai-sdk/react internals. */
+export interface ChatWidgetMessage {
+  id: string;
+  role: "user" | "assistant" | "system" | "data";
+  parts: Array<ChatWidgetMessagePart>;
+  /** @deprecated Use parts instead. */
+  content?: string;
+}
+
+/** A text part of a chat message. */
+export interface ChatWidgetTextPart {
+  type: "text";
+  text: string;
+}
+
+/** A tool invocation part of a chat message. */
+export interface ChatWidgetToolPart {
+  type: "tool-invocation";
+  toolInvocation: {
+    toolCallId: string;
+    toolName: string;
+    state: string;
+    input?: unknown;
+    output?: unknown;
+    errorText?: string;
+  };
+}
+
+/** A part of a chat message. Text or tool invocation. */
+export type ChatWidgetMessagePart = ChatWidgetTextPart | ChatWidgetToolPart;
+
 export interface ChatWidgetTheme {
   /** Primary brand color (HSL) */
   primary?: string;
@@ -37,6 +69,8 @@ export interface ChatWidgetLabels {
   close?: string;
   /** Stop generating button (default: "Stop") */
   stop?: string;
+  /** Aria label for the message input (default: "Message input") */
+  messageInputLabel?: string;
 }
 
 /** Props passed to every registered tool component. */
@@ -107,6 +141,7 @@ export const DEFAULT_CONFIG: ResolvedChatWidgetConfig = {
     clearChat: "Clear chat",
     close: "Close",
     stop: "Stop",
+    messageInputLabel: "Message input",
   },
   tools: {},
 };

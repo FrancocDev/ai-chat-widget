@@ -36,38 +36,33 @@ function wrapClientTools(
 }
 
 /**
- * Safely converts UI messages to model messages.
- * Handles edge cases like tool invocations without results.
+ * Validates that messages do not contain pending tool invocations without results.
+ * Returns an error message if invalid, otherwise null.
  */
-async function safeConvertMessages(
-  messages: UIMessage[]
-): Promise<ReturnType<typeof convertToModelMessages>> {
-  try {
-    return await convertToModelMessages(messages);
-  } catch (error) {
-    // If conversion fails due to missing tool results, try cleaning messages
-    console.warn(
-      "[ai-chat-widget] Message conversion failed, attempting cleanup:",
-      error
-    );
-
-    const cleaned = messages.map((msg: any) => {
-      if (msg.role === "assistant" && msg.parts) {
-        // Remove tool invocation parts that don't have results yet
-        const cleanParts = msg.parts.filter((part: any) => {
-          if (part.type === "tool-invocation") {
-            // Keep only if it has a result (success or error)
-            return part.toolInvocation?.state !== "pending";
+function validateMessages(messages: UIMessage[]): string | null {
+  for (const msg of messages) {
+    if (msg.role === "assistant" && Array.isArray(msg.parts)) {
+      for (const part of msg.parts) {
+        // Narrow via `in` guard — UIMessagePart from ai doesn't expose toolInvocation
+        // as a known property, but messages from useChat include it at runtime.
+        if (
+          "type" in part &&
+          part.type === "tool-invocation" &&
+          "toolInvocation" in part
+        ) {
+          const ti = part.toolInvocation as Record<string, unknown> | undefined;
+          if (
+            ti &&
+            (ti.state === "pending" ||
+              ti.state === "input-available")
+          ) {
+            return `Message contains pending tool invocation: ${ti.toolCallId}`;
           }
-          return true;
-        });
-        return { ...msg, parts: cleanParts };
+        }
       }
-      return msg;
-    });
-
-    return await convertToModelMessages(cleaned);
+    }
   }
+  return null;
 }
 
 /**
@@ -129,20 +124,27 @@ export function createChatRoute(config: ChatRouteConfig) {
         });
       }
 
+      const validationError = validateMessages(body.messages);
+      if (validationError) {
+        return new Response(
+          JSON.stringify({ error: validationError }),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
       const system =
         typeof config.systemPrompt === "function"
           ? await config.systemPrompt()
           : config.systemPrompt;
 
-      const messages = await safeConvertMessages(body.messages);
+      const messages = await convertToModelMessages(body.messages);
 
       const result = streamText({
         model,
         system,
         messages,
         tools: processedTools,
-        maxSteps: 10,
-      } as any);
+      });
 
       return result.toUIMessageStreamResponse();
     } catch (error) {

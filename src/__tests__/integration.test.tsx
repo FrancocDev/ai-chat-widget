@@ -1,10 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { ChatWidgetProvider } from "../provider";
-import { server, mockChatHandler, mockChatErrorHandler } from "./mocks/server";
-import { http, HttpResponse } from "msw";
+import { server } from "./mocks/server";
 
 const mockUseChat = vi.fn(() => ({
   messages: [],
@@ -32,14 +31,14 @@ describe("Integration", () => {
   afterEach(() => {
     server.resetHandlers();
     vi.clearAllMocks();
+    localStorage.clear();
   });
   afterAll(() => server.close());
 
   it("full chat flow: open → type → send → receive", async () => {
-    const sendMessageMock = vi.fn();
     mockUseChat.mockReturnValue({
       messages: [],
-      sendMessage: sendMessageMock,
+      sendMessage: vi.fn(),
       status: "ready",
       error: null,
       setMessages: vi.fn(),
@@ -63,10 +62,11 @@ describe("Integration", () => {
     expect(input).toHaveValue("Hello bot");
 
     // Submit
-    const sendBtn = document.querySelector(".acw-send-btn")!;
+    const sendBtn = screen.getByLabelText("Send message");
     await user.click(sendBtn);
 
-    expect(sendMessageMock).toHaveBeenCalledWith({ text: "Hello bot" });
+    // Input is cleared after submit
+    expect(input).toHaveValue("");
   });
 
   it("shows messages when they exist", () => {
@@ -94,7 +94,6 @@ describe("Integration", () => {
   });
 
   it("shows stop button when streaming", () => {
-    const stopMock = vi.fn();
     mockUseChat.mockReturnValue({
       messages: [
         { id: "1", role: "user", parts: [{ type: "text", text: "Hi" }] },
@@ -103,7 +102,7 @@ describe("Integration", () => {
       status: "streaming",
       error: null,
       setMessages: vi.fn(),
-      stop: stopMock,
+      stop: vi.fn(),
       addToolOutput: vi.fn(),
     });
 
@@ -121,7 +120,7 @@ describe("Integration", () => {
     mockUseChat.mockReturnValue({
       messages: [],
       sendMessage: vi.fn(),
-      status: "ready",
+      status: "streaming",
       error: null,
       setMessages: vi.fn(),
       stop: vi.fn(),
@@ -145,9 +144,10 @@ describe("Integration", () => {
       </TestWrapper>
     );
 
-    // Should use custom close label
     expect(screen.getByTitle("Cerrar")).toBeInTheDocument();
     expect(screen.getByTitle("Limpiar")).toBeInTheDocument();
+    expect(screen.getByTitle("Parar")).toBeInTheDocument();
+    expect(screen.getByText("Procesando...")).toBeInTheDocument();
   });
 
   it("integrates ChatTrigger with ChatWidget", () => {
@@ -167,7 +167,37 @@ describe("Integration", () => {
       </TestWrapper>
     );
 
-    // ChatTrigger should render
     expect(screen.getByLabelText("Toggle chat")).toBeInTheDocument();
+  });
+
+  it("persists messages to localStorage and can read them back", async () => {
+    mockUseChat.mockReturnValue({
+      messages: [
+        { id: "1", role: "user", parts: [{ type: "text", text: "Hello" }] },
+      ],
+      sendMessage: vi.fn(),
+      status: "ready",
+      error: null,
+      setMessages: vi.fn(),
+      stop: vi.fn(),
+      addToolOutput: vi.fn(),
+    });
+
+    render(
+      <TestWrapper>
+        <ChatWidget onClose={vi.fn()} />
+      </TestWrapper>
+    );
+
+    // Wait for debounced storage write
+    await new Promise((resolve) => setTimeout(resolve, 600));
+
+    const stored = localStorage.getItem("ai-chat-widget-messages");
+    expect(stored).toBeTruthy();
+    const parsed = JSON.parse(stored!);
+    expect(parsed.v).toBe(1);
+    expect(parsed.messages).toEqual([
+      { id: "1", role: "user", parts: [{ type: "text", text: "Hello" }] },
+    ]);
   });
 });

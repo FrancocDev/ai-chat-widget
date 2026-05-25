@@ -67,6 +67,9 @@ export const POST = createChatRoute({
     emptyStateMessage: "Ask me anything!", // default
     storageKey: "ai-chat-widget",        // localStorage prefix
     theme: { /* see below */ },
+    labels: {
+      messageInputLabel: "Message input",  // aria-label for the input field
+    },
   }}
 >
 ```
@@ -125,6 +128,10 @@ export const POST = createChatRoute({
 | `ChatWidgetConfig` | Type | Config shape |
 | `ChatRouteConfig` | Type | Server config shape |
 | `ChatWidgetTheme` | Type | Theme shape |
+| `ChatWidgetMessage` | Type | Public message shape |
+| `ChatWidgetMessagePart` | Type | Discriminated union of text or tool-invocation parts |
+| `ChatWidgetTextPart` | Type | Text part of a message |
+| `ChatWidgetToolPart` | Type | Tool invocation part of a message |
 
 ## Peer Dependencies
 
@@ -134,7 +141,7 @@ This package expects your project to already have:
 |---------|---------|
 | `ai` | `^6.0.0` |
 | `@ai-sdk/react` | `^3.0.0` |
-| `@ai-sdk/openai` | `^3.0.0` |
+| `@ai-sdk/openai` | `^3.0.0` | Optional: only needed if using the built-in OpenAI provider on the server |
 | `react` | `^18 \|\| ^19` |
 | `react-dom` | `^18 \|\| ^19` |
 

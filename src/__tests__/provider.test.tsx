@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { render, screen } from "@testing-library/react";
 import { renderHook } from "@testing-library/react";
 import { ChatWidgetProvider, useChatWidgetConfig } from "../provider";
 import { DEFAULT_CONFIG } from "../types";
@@ -55,13 +56,18 @@ describe("ChatWidgetProvider", () => {
     expect(result.current.tools.myTool).toBe(mockTool);
   });
 
-  it("renders style tag with CSS", () => {
-    const { result } = renderHook(() => useChatWidgetConfig(), {
-      wrapper: wrapper({}),
-    });
-    const styleEl = document.querySelector("style[data-acw]");
-    expect(styleEl).toBeInTheDocument();
-    expect(styleEl!.textContent).toContain("--acw-primary");
-    expect(styleEl!.textContent).toContain(".acw-chat-panel");
+  it("renders children with merged config", () => {
+    function Consumer() {
+      const config = useChatWidgetConfig();
+      return <div data-testid="title">{config.title}</div>;
+    }
+
+    render(
+      <ChatWidgetProvider config={{ title: "Provider Test" }}>
+        <Consumer />
+      </ChatWidgetProvider>
+    );
+
+    expect(screen.getByTestId("title")).toHaveTextContent("Provider Test");
   });
 });

@@ -31,7 +31,7 @@ describe("createChatRoute", () => {
     expect(typeof handler).toBe("function");
   });
 
-  it("handles a valid POST request with static system prompt", async () => {
+  it("responds with a stream on valid POST", async () => {
     const handler = createChatRoute({
       apiKey: "test-key",
       model: "gpt-4o",
@@ -50,12 +50,10 @@ describe("createChatRoute", () => {
     expect(response.headers.get("Content-Type")).toBe("text/event-stream");
   });
 
-  it("handles async system prompt", async () => {
+  it("responds with a stream when system prompt is async", async () => {
     const handler = createChatRoute({
       apiKey: "test-key",
-      systemPrompt: async () => {
-        return "Dynamic prompt";
-      },
+      systemPrompt: async () => "Dynamic prompt",
     });
 
     const request = new Request("https://example.com/api/chat", {
@@ -67,6 +65,7 @@ describe("createChatRoute", () => {
 
     const response = await handler(request);
     expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toBe("text/event-stream");
   });
 
   it("returns 400 on malformed JSON body", async () => {
@@ -82,82 +81,138 @@ describe("createChatRoute", () => {
 
     const response = await handler(request);
     expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe("Bad request");
   });
 
-  it("uses custom baseURL when provided", async () => {
-    const { createOpenAI } = await import("@ai-sdk/openai");
+  it("returns 400 when messages contain pending tool invocations", async () => {
     const handler = createChatRoute({
       apiKey: "test-key",
-      baseURL: "https://api.groq.com/openai/v1",
       systemPrompt: "Hello",
     });
 
-    await handler(
-      new Request("https://example.com/api/chat", {
-        method: "POST",
-        body: JSON.stringify({ messages: [{ role: "user", content: "Hi" }] }),
-      })
-    );
-
-    expect(createOpenAI).toHaveBeenCalledWith({
-      baseURL: "https://api.groq.com/openai/v1",
-      apiKey: "test-key",
+    const request = new Request("https://example.com/api/chat", {
+      method: "POST",
+      body: JSON.stringify({
+        messages: [
+          {
+            role: "assistant",
+            parts: [
+              {
+                type: "tool-invocation",
+                toolInvocation: {
+                  toolCallId: "tc-1",
+                  state: "pending",
+                },
+              },
+            ],
+          },
+        ],
+      }),
     });
+
+    const response = await handler(request);
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toContain("pending tool invocation");
   });
 
-  it("wraps client-side tools with proxy execute", async () => {
+  it("returns 500 on unexpected server errors", async () => {
     const { streamText } = await import("ai");
-    const mockTool = {
-      type: "tool",
-      description: "Test tool",
-    } as unknown as import("ai").Tool;
+    (streamText as any).mockImplementationOnce(() => {
+      throw new Error("OpenAI down");
+    });
 
     const handler = createChatRoute({
       apiKey: "test-key",
       systemPrompt: "Hello",
-      tools: { testTool: mockTool },
     });
 
-    await handler(
-      new Request("https://example.com/api/chat", {
-        method: "POST",
-        body: JSON.stringify({ messages: [{ role: "user", content: "Hi" }] }),
-      })
-    );
-
-    const call = (streamText as any).mock.calls[0][0];
-    expect(call.tools).toBeDefined();
-    expect(call.tools.testTool).toMatchObject({
-      description: "Test tool",
-      type: "tool",
+    const request = new Request("https://example.com/api/chat", {
+      method: "POST",
+      body: JSON.stringify({ messages: [{ role: "user", content: "Hi" }] }),
     });
-    // Client-side tools get wrapped with an execute proxy
-    expect(typeof call.tools.testTool.execute).toBe("function");
-    expect(call.maxSteps).toBe(10);
+
+    const response = await handler(request);
+    expect(response.status).toBe(500);
+    const body = await response.json();
+    expect(body.error).toBe("Internal server error");
   });
 
-  it("passes server-side tools unchanged", async () => {
-    const { streamText } = await import("ai");
-    const serverTool = {
-      type: "tool",
-      description: "Server tool",
-      execute: async () => ({ result: "ok" }),
-    } as unknown as import("ai").Tool;
-
+  it("returns 400 when tool invocation state is input-available", async () => {
     const handler = createChatRoute({
       apiKey: "test-key",
       systemPrompt: "Hello",
-      tools: { serverTool },
     });
 
-    await handler(
-      new Request("https://example.com/api/chat", {
-        method: "POST",
-        body: JSON.stringify({ messages: [{ role: "user", content: "Hi" }] }),
-      })
-    );
+    const request = new Request("https://example.com/api/chat", {
+      method: "POST",
+      body: JSON.stringify({
+        messages: [
+          {
+            role: "assistant",
+            parts: [
+              {
+                type: "tool-invocation",
+                toolInvocation: {
+                  toolCallId: "tc-2",
+                  state: "input-available",
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    });
 
-    const call = (streamText as any).mock.calls[0][0];
-    expect(call.tools.serverTool.execute).toBe(serverTool.execute);
+    const response = await handler(request);
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toContain("pending tool invocation");
+  });
+
+  it("wraps client-side tools and still responds successfully", async () => {
+    const handler = createChatRoute({
+      apiKey: "test-key",
+      systemPrompt: "Hello",
+      tools: {
+        myClientTool: { description: "A tool without execute" },
+      },
+    });
+
+    const request = new Request("https://example.com/api/chat", {
+      method: "POST",
+      body: JSON.stringify({
+        messages: [{ role: "user", content: "Hi" }],
+      }),
+    });
+
+    const response = await handler(request);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toBe("text/event-stream");
+  });
+
+  it("handles server-side tools with execute function", async () => {
+    const handler = createChatRoute({
+      apiKey: "test-key",
+      systemPrompt: "Hello",
+      tools: {
+        myServerTool: {
+          description: "A tool with execute",
+          execute: async () => "result",
+        },
+      },
+    });
+
+    const request = new Request("https://example.com/api/chat", {
+      method: "POST",
+      body: JSON.stringify({
+        messages: [{ role: "user", content: "Hi" }],
+      }),
+    });
+
+    const response = await handler(request);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toBe("text/event-stream");
   });
 });

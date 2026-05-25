@@ -1,9 +1,31 @@
 # Changelog
 
+## [0.6.0] - 2026-05-25
+
+### Changed
+- **Discriminated union for message parts**: `ChatWidgetMessagePart` is now a proper discriminated union (`ChatWidgetTextPart | ChatWidgetToolPart`) instead of an interface with `[key: string]: unknown`. This restores type safety and eliminates the need for duck-typing helpers.
+- **Input label separated from placeholder**: Added `messageInputLabel` to `ChatWidgetLabels` (default: `"Message input"`). The input's `<label>` no longer duplicates the placeholder text, improving screen reader experience.
+- **Transport reacts to `apiEndpoint` changes**: The chat transport is now recreated when `apiEndpoint` changes at runtime.
+- **Error boundary retry**: `LazyErrorBoundary` now uses a `retryKey` to force clean remount on retry, making error recovery more reliable.
+- **Single-pass message rendering**: `MessageList` now iterates message parts once instead of twice.
+
+### Fixed
+- **CHANGELOG accuracy**: v0.5.6 and v0.4.0 entries corrected to match actual code (no `safeConvertMessages`, `convertToModelMessages` is still called).
+- **Type safety**: Removed unsafe `as any[]` cast in server validation; added proper type guards.
+- **Accessibility**: Added `aria-hidden="true"` to all decorative SVG icons (trigger button, message input, empty state).
+- **Semantic HTML**: Code blocks now render with `<pre>` instead of `<div>`.
+- **Server validation**: `validateMessages` now properly checks for pending tool invocations.
+- **Dead type declarations**: Removed `src/types/react-syntax-highlighter.d.ts` which had wrong module paths.
+
+### Added
+- **`sideEffects` field** in package.json to help bundlers with tree-shaking.
+- **Test coverage**: Improved from 83% to 91.7% statements by adding behavior-based tests for error boundaries, server validation, legacy storage, and tool rendering edge cases.
+- **`@vitest/coverage-v8`** as dev dependency.
+
 ## [0.5.6] - 2026-05-25
 
 ### Fixed
-- **Restored tool support in `createChatRoute` with robust error handling**: Added back the `tools` option with `maxSteps: 10` and automatic wrapping of client-side tools (tools without `execute`) with a proxy. Added `safeConvertMessages` that catches `MissingToolResultsError` from `convertToModelMessages` and cleans up pending tool invocations before retrying. Server-side tools with `execute` are passed through unchanged.
+- **Request validation in `createChatRoute`**: Added `validateMessages` to reject requests containing pending tool invocations before passing them to `convertToModelMessages`, preventing `MissingToolResultsError` from `streamText` in `ai` v6. Client-side tools (without `execute`) are automatically wrapped with a proxy.
 
 ## [0.5.5] - 2026-05-25
 
@@ -46,7 +68,7 @@
 - **`any` type removed** from ReactMarkdown `code` component — now properly typed.
 
 ### Removed
-- **`convertToModelMessages`** no longer called manually in server route — `streamText` handles message conversion natively.
+- **Internal `convertToModelMessages` refactored**: Conversion still runs in server route but is now preceded by `validateMessages` to catch pending tool invocations early.
 
 ## [0.3.6] - 2026-03-RELEASE_DATE
 - Initial public release with `ChatWidgetProvider`, `ChatTrigger`, `ChatWidget`, `createChatRoute`.

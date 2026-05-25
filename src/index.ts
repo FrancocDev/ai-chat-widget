@@ -9,4 +9,8 @@ export type {
   ResolvedChatWidgetConfig,
   ToolComponentProps,
   ToolComponent,
+  ChatWidgetMessage,
+  ChatWidgetMessagePart,
+  ChatWidgetTextPart,
+  ChatWidgetToolPart,
 } from "./types";
