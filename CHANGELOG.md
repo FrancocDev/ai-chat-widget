@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.5.4] - 2026-05-25
+
+### Fixed
+- **Multi-step tool execution**: Added `maxSteps: 10` to `streamText` in `createChatRoute`. This allows the AI model to perform multiple tool calls in a single conversation turn and properly handle client-side tool results without `MissingToolResultsError`.
+
 ## [0.5.2] - 2026-05-24
 
 ### Fixed

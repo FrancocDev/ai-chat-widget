@@ -136,5 +136,6 @@ describe("createChatRoute", () => {
     });
     // Client-side tools get wrapped with an execute proxy
     expect(typeof call.tools.testTool.execute).toBe("function");
+    expect(call.maxSteps).toBe(10);
   });
 });

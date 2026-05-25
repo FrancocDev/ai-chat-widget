@@ -99,7 +99,8 @@ export function createChatRoute(config: ChatRouteConfig) {
         system,
         messages: await convertToModelMessages(body.messages),
         tools: processedTools,
-      });
+        maxSteps: 10,
+      } as any);
 
       return result.toUIMessageStreamResponse();
     } catch (error) {
