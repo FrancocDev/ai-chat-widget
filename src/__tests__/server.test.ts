@@ -104,4 +104,60 @@ describe("createChatRoute", () => {
       apiKey: "test-key",
     });
   });
+
+  it("wraps client-side tools with proxy execute", async () => {
+    const { streamText } = await import("ai");
+    const mockTool = {
+      type: "tool",
+      description: "Test tool",
+    } as unknown as import("ai").Tool;
+
+    const handler = createChatRoute({
+      apiKey: "test-key",
+      systemPrompt: "Hello",
+      tools: { testTool: mockTool },
+    });
+
+    await handler(
+      new Request("https://example.com/api/chat", {
+        method: "POST",
+        body: JSON.stringify({ messages: [{ role: "user", content: "Hi" }] }),
+      })
+    );
+
+    const call = (streamText as any).mock.calls[0][0];
+    expect(call.tools).toBeDefined();
+    expect(call.tools.testTool).toMatchObject({
+      description: "Test tool",
+      type: "tool",
+    });
+    // Client-side tools get wrapped with an execute proxy
+    expect(typeof call.tools.testTool.execute).toBe("function");
+    expect(call.maxSteps).toBe(10);
+  });
+
+  it("passes server-side tools unchanged", async () => {
+    const { streamText } = await import("ai");
+    const serverTool = {
+      type: "tool",
+      description: "Server tool",
+      execute: async () => ({ result: "ok" }),
+    } as unknown as import("ai").Tool;
+
+    const handler = createChatRoute({
+      apiKey: "test-key",
+      systemPrompt: "Hello",
+      tools: { serverTool },
+    });
+
+    await handler(
+      new Request("https://example.com/api/chat", {
+        method: "POST",
+        body: JSON.stringify({ messages: [{ role: "user", content: "Hi" }] }),
+      })
+    );
+
+    const call = (streamText as any).mock.calls[0][0];
+    expect(call.tools.serverTool.execute).toBe(serverTool.execute);
+  });
 });
