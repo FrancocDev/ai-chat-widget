@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.5.2] - 2026-05-24
+
+### Fixed
+- **Client-side tool support for `ai` v6**: `createChatRoute` now automatically wraps tools without an `execute` function (client-side UI tools) with a proxy `execute` that returns `{ __client_tool: true, args }`. This prevents `MissingToolResultsError` from `streamText` in `ai` v6, which requires all tools passed to it to have an `execute` function. Server-side tools (with `execute`) continue to work as before.
+
 ## [0.5.1] - 2026-05-24
 
 ### Fixed

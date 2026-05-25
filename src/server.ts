@@ -1,5 +1,5 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import { streamText, convertToModelMessages, type UIMessage } from "ai";
+import { streamText, convertToModelMessages, type UIMessage, type Tool } from "ai";
 import type { ChatRouteConfig } from "./types";
 
 /**
@@ -40,12 +40,42 @@ import type { ChatRouteConfig } from "./types";
  * export const POST = handler;
  * ```
  */
+const CLIENT_TOOL_MARKER = "__client_tool";
+
+function isClientTool(tool: Tool): boolean {
+  return !tool.execute;
+}
+
+function wrapClientTools(
+  tools?: Record<string, Tool>
+): Record<string, Tool> | undefined {
+  if (!tools) return undefined;
+
+  const wrapped: Record<string, Tool> = {};
+  for (const [name, toolDef] of Object.entries(tools)) {
+    if (isClientTool(toolDef)) {
+      wrapped[name] = {
+        ...toolDef,
+        execute: async (args: unknown) => ({
+          [CLIENT_TOOL_MARKER]: true,
+          args,
+        }),
+      };
+    } else {
+      wrapped[name] = toolDef;
+    }
+  }
+  return wrapped;
+}
+
 export function createChatRoute(config: ChatRouteConfig) {
   const openai = createOpenAI({
     baseURL: config.baseURL ?? "https://api.openai.com/v1",
     apiKey: config.apiKey,
   });
   const model = openai(config.model ?? "gpt-4o-mini");
+
+  const processedTools = wrapClientTools(config.tools);
 
   return async (request: Request): Promise<Response> => {
     try {
@@ -68,7 +98,7 @@ export function createChatRoute(config: ChatRouteConfig) {
         model,
         system,
         messages: await convertToModelMessages(body.messages),
-        tools: config.tools,
+        tools: processedTools,
       });
 
       return result.toUIMessageStreamResponse();
