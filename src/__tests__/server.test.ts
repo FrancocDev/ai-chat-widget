@@ -123,10 +123,18 @@ describe("createChatRoute", () => {
       })
     );
 
-    expect(streamText).toHaveBeenCalledWith(
-      expect.objectContaining({
-        tools: { testTool: mockTool },
-      })
-    );
+    const call = (streamText as any).mock.calls[0][0];
+    expect(call).toMatchObject({
+      messages: [{ role: "user", content: "Hi" }],
+      model: { modelId: "gpt-4o-mini" },
+      system: "Hello",
+    });
+    expect(call.tools).toBeDefined();
+    expect(call.tools.testTool).toMatchObject({
+      description: "Test tool",
+      type: "tool",
+    });
+    // Client-side tools get wrapped with an execute proxy
+    expect(typeof call.tools.testTool.execute).toBe("function");
   });
 });
